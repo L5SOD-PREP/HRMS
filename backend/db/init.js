@@ -33,7 +33,7 @@ async function initDb() {
       EmpLastName TEXT NOT NULL,
       EmpGender TEXT,
       EmpDateOfBirth TEXT,
-      EmpEmail TEXT UNIQUE,
+      EmpEmail TEXT,
       EmpTelephone TEXT,
       EmpAddress TEXT,
       EmpHireDate TEXT,
@@ -55,11 +55,10 @@ async function initDb() {
   `);
   db.run(`
     CREATE TABLE IF NOT EXISTS Security (
-      SecurityID INTEGER PRIMARY KEY AUTOINCREMENT,
-      UserID INTEGER NOT NULL,
-      Question TEXT NOT NULL,
-      Answer TEXT NOT NULL,
-      FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+      secID INTEGER PRIMARY KEY AUTOINCREMENT,
+      UserName TEXT NOT NULL,
+      question TEXT NOT NULL,
+      answer TEXT NOT NULL
     )
   `);
 
@@ -104,13 +103,13 @@ async function initDb() {
     e4.bind([null, 'Alice', 'Mutoni', 'Female', '1995-12-10', 'alice@hrms.com', '0788333333', 'Kigali', '2024-04-01', 'On mission', 3, 5]);
     e4.step(); e4.free();
 
-    const hash = bcrypt.hashSync('admin123', 10);
+    const hash = bcrypt.hashSync('Admin@123', 10);
     const uStmt = db.prepare('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)');
     uStmt.bind([1, 'admin', hash]); uStmt.step(); uStmt.free();
 
     const secHash = bcrypt.hashSync('blue', 10);
-    const sStmt = db.prepare('INSERT INTO Security (UserID, Question, Answer) VALUES (?, ?, ?)');
-    sStmt.bind([1, 'What is your favorite color?', secHash]); sStmt.step(); sStmt.free();
+    const sStmt = db.prepare('INSERT INTO Security (UserName, question, answer) VALUES (?, ?, ?)');
+    sStmt.bind(['admin', 'What is your favorite color?', secHash]); sStmt.step(); sStmt.free();
   }
 
   const data = db.export();

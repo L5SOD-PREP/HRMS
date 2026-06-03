@@ -53,21 +53,25 @@ router.get('/me', (req, res) => {
 });
 
 router.get('/security-question/:username', (req, res) => {
-  const user = get('SELECT UserID FROM Users WHERE UserName = ?', [req.params.username]);
+  const user = get('SELECT UserName FROM Users WHERE UserName = ?', [req.params.username]);
   if (!user) return res.status(404).json({ error: 'Username not found.' });
-  const sec = get('SELECT SecurityID, Question FROM Security WHERE UserID = ?', [user.UserID]);
-  if (!sec) return res.status(404).json({ error: 'No security question set.' });
-  return res.json({ securityId: sec.SecurityID, question: sec.Question });
+
+  const sec = get('SELECT secID, question FROM Security WHERE UserName = ?', [req.params.username]);
+  if (!sec) return res.status(404).json({ error: 'No security question set for this user.' });
+
+  return res.json({ secId: sec.secID, question: sec.question });
 });
 
 router.post('/verify-answer', (req, res) => {
-  const { securityId, answer } = req.body;
-  const sec = get('SELECT * FROM Security WHERE SecurityID = ?', [securityId]);
+  const { secId, answer } = req.body;
+  const sec = get('SELECT * FROM Security WHERE secID = ?', [secId]);
   if (!sec) return res.status(404).json({ error: 'Security question not found.' });
-  if (!bcrypt.compareSync(answer, sec.Answer)) {
+
+  if (!bcrypt.compareSync(answer, sec.answer)) {
     return res.status(401).json({ error: 'Incorrect answer.' });
   }
-  const user = get('SELECT UserID, UserName FROM Users WHERE UserID = ?', [sec.UserID]);
+
+  const user = get('SELECT UserID, UserName FROM Users WHERE UserName = ?', [sec.UserName]);
   return res.json({ message: 'Answer verified', userId: user.UserID, username: user.UserName });
 });
 

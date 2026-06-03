@@ -23,13 +23,12 @@ router.post('/', (req, res) => {
   if (existing) return res.status(400).json({ error: 'Username already taken.' });
 
   const hash = bcrypt.hashSync(Password, 10);
-  run('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)', [EmpID, UserName, hash]);
+  run('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)', [Number(EmpID), UserName, hash]);
   save();
 
   if (securityQuestion && securityAnswer) {
-    const user = get('SELECT UserID FROM Users WHERE UserName = ?', [UserName]);
     const ansHash = bcrypt.hashSync(securityAnswer, 10);
-    run('INSERT INTO Security (UserID, Question, Answer) VALUES (?, ?, ?)', [user.UserID, securityQuestion, ansHash]);
+    run('INSERT INTO Security (UserName, question, answer) VALUES (?, ?, ?)', [UserName, securityQuestion, ansHash]);
     save();
   }
 
@@ -40,9 +39,9 @@ router.put('/:id', (req, res) => {
   const { EmpID, UserName, Password } = req.body;
   if (Password) {
     const hash = bcrypt.hashSync(Password, 10);
-    run('UPDATE Users SET EmpID=?, UserName=?, Password=? WHERE UserID=?', [EmpID, UserName, hash, req.params.id]);
+    run('UPDATE Users SET EmpID=?, UserName=?, Password=? WHERE UserID=?', [Number(EmpID), UserName, hash, req.params.id]);
   } else {
-    run('UPDATE Users SET EmpID=?, UserName=? WHERE UserID=?', [EmpID, UserName, req.params.id]);
+    run('UPDATE Users SET EmpID=?, UserName=? WHERE UserID=?', [Number(EmpID), UserName, req.params.id]);
   }
   save();
   return res.json({ message: 'User updated.' });

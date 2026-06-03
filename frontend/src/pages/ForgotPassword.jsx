@@ -5,7 +5,7 @@ import api from '../api/axios';
 export default function ForgotPassword() {
   const [step, setStep] = useState(1);
   const [username, setUsername] = useState('');
-  const [securityId, setSecurityId] = useState(null);
+  const [secId, setSecId] = useState(null);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [userId, setUserId] = useState(null);
@@ -20,7 +20,7 @@ export default function ForgotPassword() {
     setMessage('');
     try {
       const res = await api.get(`/auth/security-question/${username}`);
-      setSecurityId(res.data.securityId);
+      setSecId(res.data.secId);
       setQuestion(res.data.question);
       setStep(2);
     } catch (err) {
@@ -33,7 +33,7 @@ export default function ForgotPassword() {
     setError('');
     setMessage('');
     try {
-      const res = await api.post('/auth/verify-answer', { securityId, answer });
+      const res = await api.post('/auth/verify-answer', { secId, answer });
       setUserId(res.data.userId);
       setMessage('Answer verified! Set a new password.');
       setStep(3);
