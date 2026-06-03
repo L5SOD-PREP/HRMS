@@ -29,9 +29,9 @@ export default function Dashboard() {
   return (
     <>
       {/* Welcome */}
-      <div className="card-dash p-4 mb-4" style={{background:'linear-gradient(135deg,#0f172a,#1e3a5f)',color:'#fff'}}>
-        <h4 style={{fontWeight:700}}>Welcome to DAB HRMS</h4>
-        <p className="mb-0" style={{color:'#94a3b8'}}>Your centralized human resource management platform.</p>
+      <div className="card-dash p-4 mb-4">
+        <h4 style={{fontWeight:700,color:'#0f172a'}}>Welcome to DAB HRMS</h4>
+        <p className="mb-0" style={{color:'#64748b'}}>Your centralized human resource management platform.</p>
       </div>
 
       {/* Stat Cards */}

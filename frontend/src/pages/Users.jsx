@@ -69,7 +69,7 @@ export default function Users() {
                 <input className="form-control" placeholder="Security answer" value={form.securityAnswer} onChange={e => setForm({ ...form, securityAnswer: e.target.value })} />
               </div>
             </div>
-            <button className="btn mt-2" type="submit" style={{background:'#10b981',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.85rem',padding:'0.4rem 1rem',display:'inline-flex',alignItems:'center',gap:'0.35rem'}}>
+            <button className="btn mt-2" type="submit" style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.85rem',padding:'0.4rem 1rem',display:'inline-flex',alignItems:'center',gap:'0.35rem'}}>
               <Check size={14} /> {editId ? 'Update' : 'Create'}
             </button>
           </form>

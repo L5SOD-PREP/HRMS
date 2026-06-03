@@ -87,4 +87,21 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
+router.post('/change-password', async (req, res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters.' });
+    }
+    const [users] = await pool.execute('SELECT Password FROM Users WHERE UserID = ?', [req.session.userId]);
+    if (!bcrypt.compareSync(currentPassword, users[0].Password)) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await pool.execute('UPDATE Users SET Password = ? WHERE UserID = ?', [hash, req.session.userId]);
+    return res.json({ message: 'Password changed successfully.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
+});
+
 export default router;

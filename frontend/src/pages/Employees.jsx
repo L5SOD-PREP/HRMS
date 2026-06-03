@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api';
 import {
   Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight,
-  Clock, UserX, AlertTriangle, Skull, MapPin, UserCheck, Eye
+  Clock, UserX, AlertTriangle, Skull, MapPin, UserCheck
 } from 'lucide-react';
 
 const statusIcons = {
@@ -22,17 +22,29 @@ const statusBgs = {
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [departments, setDepartments] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
 
   useEffect(() => {
-    api.get(`/employees?search=${search}&page=${page}&limit=${limit}`)
+    api.get('/departments').then(r => setDepartments(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (statusFilter) params.set('status', statusFilter);
+    if (deptFilter) params.set('departID', deptFilter);
+    api.get(`/employees?${params}`)
       .then(r => {
-        setEmployees(r.data.employees || r.data);
-        setTotal(r.data.total || r.data.length || 0);
+        const data = Array.isArray(r.data) ? r.data : r.data.employees || [];
+        setEmployees(data);
+        setTotal(data.length);
       }).catch(() => {});
-  }, [search, page]);
+  }, [search, statusFilter, deptFilter, page]);
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this employee?')) return;
@@ -48,8 +60,8 @@ export default function Employees() {
 
   return (
     <>
-      <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <div style={{position:'relative',maxWidth:'300px',width:'100%'}}>
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div style={{position:'relative',maxWidth:'280px',flex:1,minWidth:'160px'}}>
           <Search size={16} style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',color:'#94a3b8'}} />
           <input
             type="text" className="form-control" placeholder="Search employees..."
@@ -57,7 +69,21 @@ export default function Employees() {
             value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
-        <Link to="/employees/new" className="btn" style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.9rem',padding:'0.5rem 1rem',display:'flex',alignItems:'center',gap:'0.4rem'}}>
+        <select className="form-select" style={{width:'auto',borderRadius:'0.5rem',border:'1.5px solid #e2e8f0',fontSize:'0.85rem',padding:'0.45rem 2rem 0.45rem 0.75rem'}}
+          value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+          <option value="">All Statuses</option>
+          {['Active','On leave','Left','Blacklisted','Deceased','On mission'].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select className="form-select" style={{width:'auto',borderRadius:'0.5rem',border:'1.5px solid #e2e8f0',fontSize:'0.85rem',padding:'0.45rem 2rem 0.45rem 0.75rem'}}
+          value={deptFilter} onChange={e => { setDeptFilter(e.target.value); setPage(1); }}>
+          <option value="">All Departments</option>
+          {departments.map(d => (
+            <option key={d.DeptID} value={d.DeptID}>{d.DepartName}</option>
+          ))}
+        </select>
+        <Link to="/employees/new" className="btn" style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.9rem',padding:'0.5rem 1rem',display:'flex',alignItems:'center',gap:'0.4rem',marginLeft:'auto'}}>
           <Plus size={16} /> Add Employee
         </Link>
       </div>

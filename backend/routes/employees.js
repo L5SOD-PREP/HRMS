@@ -7,17 +7,27 @@ router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, status, departID } = req.query;
     let sql = `SELECT e.*, d.DepartName, p.PosName 
       FROM Employee e 
       LEFT JOIN Department d ON e.DepartID = d.DepartID 
       LEFT JOIN \`Position\` p ON e.PosID = p.PosID`;
+    const conditions = [];
     const params = [];
     if (search) {
-      sql += ` WHERE e.EmpFirstName LIKE ? OR e.EmpLastName LIKE ? OR e.EmpEmail LIKE ? OR e.EmpTelephone LIKE ?`;
+      conditions.push(`(e.EmpFirstName LIKE ? OR e.EmpLastName LIKE ? OR e.EmpEmail LIKE ? OR e.EmpTelephone LIKE ?)`);
       const s = `%${search}%`;
       params.push(s, s, s, s);
     }
+    if (status) {
+      conditions.push(`e.EmpStatus = ?`);
+      params.push(status);
+    }
+    if (departID) {
+      conditions.push(`e.DeptID = ?`);
+      params.push(departID);
+    }
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY e.EmpID DESC';
     const [rows] = await pool.execute(sql, params);
     return res.json(rows);
