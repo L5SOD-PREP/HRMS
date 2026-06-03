@@ -44,7 +44,7 @@ export default function Landing() {
           <button className="btn btn-primary-glow" onClick={() => navigate('/login')}>
             Get Started <ArrowRight size={16} style={{marginLeft:'0.35rem',verticalAlign:'middle'}} />
           </button>
-          <button className="btn btn-outline-light" onClick={() => navigate('/forgot-password')}>
+          <button className="btn" style={{background:'transparent',border:'1px solid #cbd5e1',color:'#475569'}} onClick={() => navigate('/forgot-password')}>
             Forgot Password?
           </button>
         </div>

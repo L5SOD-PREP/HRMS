@@ -27,13 +27,12 @@ body { font-family:'Inter',sans-serif; background:#f1f5f9; color:#1e293b; }
 
 /* ── Auth Pages (Login/Forgot Password) ── */
 .auth-page {
-  min-height:100vh;
-  background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);
+  min-height:100vh; background:#f8fafc;
   display:flex; align-items:center; justify-content:center; padding:2rem;
 }
 .auth-card {
   background:#fff; border-radius:1.25rem; padding:2.5rem; width:100%; max-width:420px;
-  box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);
+  box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 .auth-card .logo-icon { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:1.5rem; }
 .auth-card .logo-icon svg { color:#3b82f6; width:2rem; height:2rem; }
