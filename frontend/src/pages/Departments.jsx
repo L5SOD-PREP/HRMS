@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { Plus, Pencil, Trash2, Building2, X, Check } from 'lucide-react';
 
@@ -8,9 +8,16 @@ export default function Departments() {
   const [editDept, setEditDept] = useState(null);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const mountedRef = useRef(true);
 
-  const fetch = () => api.get('/departments').then(r => setDepartments(r.data)).catch(() => {});
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    api.get('/departments').then(r => { if (mountedRef.current) setDepartments(r.data); }).catch(() => {}).finally(() => { if (mountedRef.current) setFetching(false); });
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const fetch = () => api.get('/departments').then(r => { if (mountedRef.current) setDepartments(r.data); });
 
   const openAdd = () => { setEditDept(null); setName(''); setShowModal(true); };
   const openEdit = (d) => { setEditDept(d); setName(d.DepartName); setShowModal(true); };
@@ -30,18 +37,18 @@ export default function Departments() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this department?')) return;
+    if (!window.confirm('Delete this department?')) return;
     try { await api.delete(`/departments/${id}`); fetch(); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
-  const Modal = ({ children }) => (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1050}} onClick={() => setShowModal(false)}>
-      <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'420px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
-        {children}
+  if (fetching) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" />
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <>
@@ -83,17 +90,19 @@ export default function Departments() {
       </div>
 
       {showModal && (
-        <Modal>
-          <h6 style={{fontWeight:600,marginBottom:'1rem'}}>{editDept ? 'Edit Department' : 'Add Department'}</h6>
-          <label className="form-label">Department Name</label>
-          <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} autoFocus />
-          <div className="d-flex gap-2 mt-3 justify-content-end">
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}><X size={14} /> Cancel</button>
-            <button className="btn btn-sm" disabled={loading} onClick={handleSave} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
-              {loading ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />} Save
-            </button>
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1050}} onClick={() => setShowModal(false)}>
+          <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'420px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
+            <h6 style={{fontWeight:600,marginBottom:'1rem'}}>{editDept ? 'Edit Department' : 'Add Department'}</h6>
+            <label className="form-label">Department Name</label>
+            <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            <div className="d-flex gap-2 mt-3 justify-content-end">
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}><X size={14} /> Cancel</button>
+              <button className="btn btn-sm" disabled={loading} onClick={handleSave} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                {loading ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />} Save
+              </button>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
     </>
   );

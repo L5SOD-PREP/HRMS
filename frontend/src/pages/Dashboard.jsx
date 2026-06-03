@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import {
   Users, Building2, Briefcase, UserCheck, UserX, Clock, AlertTriangle,
@@ -18,23 +18,44 @@ const statusConfig = {
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recentEmployees, setRecentEmployees] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    api.get('/employees/stats').then(r => setStats(r.data)).catch(() => {});
-    api.get('/employees?limit=5').then(r => setRecentEmployees(r.data.employees || r.data)).catch(() => {});
+    mountedRef.current = true;
+    Promise.all([
+      api.get('/employees/stats').then(r => r.data).catch(() => null),
+      api.get('/employees?limit=5').then(r => {
+        const data = r.data;
+        return Array.isArray(data) ? data : (data.employees || []);
+      }).catch(() => [])
+    ]).then(([s, emp]) => {
+      if (mountedRef.current) {
+        if (s) setStats(s);
+        setRecentEmployees(emp);
+        setDataLoading(false);
+      }
+    });
+    return () => { mountedRef.current = false; };
   }, []);
 
   const statusStats = stats?.statusCounts || {};
 
+  if (dataLoading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Welcome */}
       <div className="card-dash p-4 mb-4">
         <h4 style={{fontWeight:700,color:'#0f172a'}}>Welcome to DAB HRMS</h4>
         <p className="mb-0" style={{color:'#64748b'}}>Your centralized human resource management platform.</p>
       </div>
 
-      {/* Stat Cards */}
       <div className="row g-3 mb-4">
         <div className="col-md-3 col-6">
           <div className="card-dash stat-card">
@@ -75,7 +96,6 @@ export default function Dashboard() {
       </div>
 
       <div className="row g-3">
-        {/* Status Breakdown */}
         <div className="col-md-6">
           <div className="card-dash p-3">
             <h6 style={{fontWeight:600,fontSize:'0.95rem',marginBottom:'1rem'}}>Employee Status Overview</h6>
@@ -104,7 +124,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Employees */}
         <div className="col-md-6">
           <div className="card-dash p-3">
             <div className="d-flex justify-content-between align-items-center mb-2">
@@ -120,10 +139,11 @@ export default function Dashboard() {
                 {recentEmployees.map(emp => {
                   const cfg = statusConfig[emp.EmpStatus] || statusConfig['Active'];
                   const Icon = cfg.icon;
+                  const initials = (emp.EmpFirstName?.[0] || '') + (emp.EmpLastName?.[0] || '') || '?';
                   return (
                     <div key={emp.EmpID} className="d-flex align-items-center py-2" style={{borderBottom:'1px solid #f1f5f9'}}>
                       <div className="sidebar-avatar" style={{width:'34px',height:'34px',fontSize:'0.8rem',marginRight:'0.75rem'}}>
-                        {emp.EmpFirstName?.charAt(0)}{emp.EmpLastName?.charAt(0)}
+                        {initials}
                       </div>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:500,fontSize:'0.9rem'}}>{emp.EmpFirstName} {emp.EmpLastName}</div>

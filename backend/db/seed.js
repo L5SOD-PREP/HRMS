@@ -10,10 +10,13 @@ async function seed() {
     database: process.env.DB_NAME || 'HRMS'
   });
 
-  const hash = bcrypt.hashSync('Admin@123', 10);
+  const hash = await bcrypt.hash('Admin@123', 10);
 
-  await conn.execute('UPDATE Users SET Password = ?', [hash]);
-  console.log('All user passwords updated to Admin@123');
+  const [userRows] = await conn.execute('SELECT COUNT(*) as c FROM Users');
+  if (userRows[0].c > 0) {
+    await conn.execute('UPDATE Users SET Password = ?', [hash]);
+    console.log('All user passwords updated to Admin@123');
+  }
 
   const extraDepts = ['IT Support', 'Marketing', 'Procurement', 'Research & Development', 'Quality Assurance'];
   for (const name of extraDepts) {
@@ -58,15 +61,15 @@ async function seed() {
   for (const e of extraEmployees) {
     const [rows] = await conn.execute('SELECT EmpID FROM Employee WHERE EmpEmail = ?', [e[4]]);
     if (rows.length === 0) {
-      await conn.execute(`INSERT INTO Employee 
-        (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID) 
+      await conn.execute(`INSERT INTO Employee
+        (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, e);
       console.log(`  Employee added: ${e[0]} ${e[1]}`);
     }
   }
 
   const [newEmps] = await conn.execute(`
-    SELECT e.EmpID, e.EmpFirstName, e.EmpEmail FROM Employee e 
+    SELECT e.EmpID, e.EmpFirstName, e.EmpEmail FROM Employee e
     WHERE e.EmpID NOT IN (SELECT EmpID FROM Users)
   `);
 
@@ -78,7 +81,7 @@ async function seed() {
       'What is your mother maiden name?',
       'What was your first car?'
     ];
-    const ansHash = bcrypt.hashSync('answer123', 10);
+    const ansHash = await bcrypt.hash('answer123', 10);
 
     for (const row of newEmps) {
       const username = row.EmpEmail.split('@')[0];

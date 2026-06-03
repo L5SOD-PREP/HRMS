@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { ShieldCheck, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 
@@ -8,32 +8,66 @@ export default function Users() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ EmpID: '', UserName: '', Password: '', securityQuestion: '', securityAnswer: '' });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const mountedRef = useRef(true);
 
   const load = async () => {
-    const [uRes, eRes] = await Promise.all([api.get('/users'), api.get('/employees')]);
-    setUsers(uRes.data);
-    setEmployees(eRes.data);
+    const [uRes, eRes] = await Promise.all([
+      api.get('/users').catch(() => ({ data: [] })),
+      api.get('/employees').catch(() => ({ data: [] }))
+    ]);
+    if (mountedRef.current) {
+      setUsers(uRes.data);
+      setEmployees(eRes.data);
+      setDataLoading(false);
+    }
   };
-  useEffect(() => { load(); }, []);
 
-  const reset = () => { setForm({ EmpID: '', UserName: '', Password: '', securityQuestion: '', securityAnswer: '' }); setEditId(null); setShowForm(false); };
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const reset = () => { setForm({ EmpID: '', UserName: '', Password: '', securityQuestion: '', securityAnswer: '' }); setEditId(null); setShowForm(false); setError(''); };
   const openAdd = () => { reset(); setShowForm(true); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    if (!form.UserName.trim()) { setError('Username is required.'); return; }
+    if (form.Password && form.Password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setSaving(true);
     try {
-      const payload = { ...form, EmpID: Number(form.EmpID) };
+      const payload = { ...form, EmpID: Number(form.EmpID), Password: form.Password || undefined };
       if (editId) await api.put(`/users/${editId}`, payload);
       else await api.post('/users', payload);
       reset(); load();
-    } catch (err) { alert(err.response?.data?.error || 'Error'); }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error');
+    } finally { setSaving(false); }
   };
 
   const handleEdit = (u) => {
     setForm({ EmpID: u.EmpID, UserName: u.UserName, Password: '', securityQuestion: '', securityAnswer: '' });
     setEditId(u.UserID); setShowForm(true);
   };
-  const handleDelete = async (id) => { if (!confirm('Delete this user?')) return; try { await api.delete(`/users/${id}`); load(); } catch {} };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this user?')) return;
+    try { await api.delete(`/users/${id}`); load(); }
+    catch (err) { alert(err.response?.data?.error || 'Delete failed'); }
+  };
+
+  if (dataLoading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -46,6 +80,7 @@ export default function Users() {
 
       {showForm && (
         <div className="form-card mb-3">
+          {error && <div className="alert alert-danger py-1 small">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="row g-2">
               <div className="col-md-3">
@@ -60,7 +95,7 @@ export default function Users() {
                 <input className="form-control" placeholder="Username" value={form.UserName} onChange={e => setForm({ ...form, UserName: e.target.value })} required />
               </div>
               <div className="col-md-2">
-                <input type="password" className="form-control" placeholder={editId ? 'Leave blank' : 'Password'} value={form.Password} onChange={e => setForm({ ...form, Password: e.target.value })} required={!editId} />
+                <input type="password" className="form-control" placeholder={editId ? 'New password' : 'Password'} value={form.Password} onChange={e => setForm({ ...form, Password: e.target.value })} required={!editId} />
               </div>
               <div className="col-md-3">
                 <input className="form-control" placeholder="Security question" value={form.securityQuestion} onChange={e => setForm({ ...form, securityQuestion: e.target.value })} />
@@ -69,8 +104,8 @@ export default function Users() {
                 <input className="form-control" placeholder="Security answer" value={form.securityAnswer} onChange={e => setForm({ ...form, securityAnswer: e.target.value })} />
               </div>
             </div>
-            <button className="btn mt-2" type="submit" style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.85rem',padding:'0.4rem 1rem',display:'inline-flex',alignItems:'center',gap:'0.35rem'}}>
-              <Check size={14} /> {editId ? 'Update' : 'Create'}
+            <button className="btn mt-2" type="submit" disabled={saving} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.85rem',padding:'0.4rem 1rem',display:'inline-flex',alignItems:'center',gap:'0.35rem'}}>
+              {saving ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />} {editId ? 'Update' : 'Create'}
             </button>
           </form>
         </div>

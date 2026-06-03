@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { Plus, Pencil, Trash2, Briefcase, X, Check } from 'lucide-react';
 
@@ -9,9 +9,16 @@ export default function Positions() {
   const [name, setName] = useState('');
   const [qual, setQual] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const mountedRef = useRef(true);
 
-  const fetch = () => api.get('/positions').then(r => setPositions(r.data)).catch(() => {});
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    api.get('/positions').then(r => { if (mountedRef.current) setPositions(r.data); }).catch(() => {}).finally(() => { if (mountedRef.current) setFetching(false); });
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const fetch = () => api.get('/positions').then(r => { if (mountedRef.current) setPositions(r.data); });
 
   const openAdd = () => { setEditPos(null); setName(''); setQual(''); setShowModal(true); };
   const openEdit = (p) => { setEditPos(p); setName(p.PosName); setQual(p.RequiredQualification||''); setShowModal(true); };
@@ -32,18 +39,18 @@ export default function Positions() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this position?')) return;
+    if (!window.confirm('Delete this position?')) return;
     try { await api.delete(`/positions/${id}`); fetch(); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
-  const Modal = ({ children }) => (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1050}} onClick={() => setShowModal(false)}>
-      <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'420px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
-        {children}
+  if (fetching) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" />
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <>
@@ -87,23 +94,25 @@ export default function Positions() {
       </div>
 
       {showModal && (
-        <Modal>
-          <h6 style={{fontWeight:600,marginBottom:'1rem'}}>{editPos ? 'Edit Position' : 'Add Position'}</h6>
-          <div className="mb-3">
-            <label className="form-label">Position Title</label>
-            <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} autoFocus />
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1050}} onClick={() => setShowModal(false)}>
+          <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'420px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
+            <h6 style={{fontWeight:600,marginBottom:'1rem'}}>{editPos ? 'Edit Position' : 'Add Position'}</h6>
+            <div className="mb-3">
+              <label className="form-label">Position Title</label>
+              <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Required Qualification</label>
+              <input type="text" className="form-control" value={qual} onChange={e => setQual(e.target.value)} />
+            </div>
+            <div className="d-flex gap-2 mt-3 justify-content-end">
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}><X size={14} /> Cancel</button>
+              <button className="btn btn-sm" disabled={loading} onClick={handleSave} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                {loading ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />} Save
+              </button>
+            </div>
           </div>
-          <div className="mb-2">
-            <label className="form-label">Required Qualification</label>
-            <input type="text" className="form-control" value={qual} onChange={e => setQual(e.target.value)} />
-          </div>
-          <div className="d-flex gap-2 mt-3 justify-content-end">
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}><X size={14} /> Cancel</button>
-            <button className="btn btn-sm" disabled={loading} onClick={handleSave} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
-              {loading ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />} Save
-            </button>
-          </div>
-        </Modal>
+        </div>
       )}
     </>
   );

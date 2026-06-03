@@ -8,9 +8,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     api.get('/auth/me', { validateStatus: s => s === 200 || s === 401 }).then(res => {
-      setUser(res.status === 200 ? res.data.user : null);
-    }).finally(() => setLoading(false));
+      if (!cancelled) setUser(res.status === 200 ? res.data.user : null);
+    }).catch(() => {}).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const login = async (username, password) => {
@@ -20,8 +24,11 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await api.post('/auth/logout');
-    setUser(null);
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
   };
 
   return (
@@ -32,5 +39,7 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }

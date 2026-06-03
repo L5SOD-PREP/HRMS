@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Building2, Briefcase, FileText, LogOut, ShieldCheck, KeyRound, X, Check
@@ -23,9 +23,18 @@ export default function Sidebar({ user, onLogout, open, onClose }) {
   const [showPwModal, setShowPwModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [pwErr, setPwErr] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
+  const pwTimer = useState(null);
+
+  useEffect(() => {
+    if (!showPwModal) return;
+    const handler = (e) => { if (e.key === 'Escape') { setShowPwModal(false); setPwErr(''); setPwMsg(''); } };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showPwModal]);
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -36,48 +45,25 @@ export default function Sidebar({ user, onLogout, open, onClose }) {
     e.preventDefault();
     setPwErr(''); setPwMsg('');
     if (!currentPassword || !newPassword) { setPwErr('Fill all fields'); return; }
-    if (newPassword.length < 4) { setPwErr('Password must be at least 4 characters'); return; }
+    if (newPassword.length < 6) { setPwErr('Password must be at least 6 characters'); return; }
+    if (newPassword !== confirmPassword) { setPwErr('Passwords do not match'); return; }
     setPwLoading(true);
     try {
       await api.post('/auth/change-password', { currentPassword, newPassword });
       setPwMsg('Password changed successfully!');
-      setCurrentPassword(''); setNewPassword('');
-      setTimeout(() => setShowPwModal(false), 1500);
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      const timer = setTimeout(() => setShowPwModal(false), 1500);
+      return () => clearTimeout(timer);
     } catch (err) {
       setPwErr(err.response?.data?.error || 'Failed to change password');
     } finally { setPwLoading(false); }
   };
 
-  const PwModal = () => (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1060}} onClick={() => { setShowPwModal(false); setPwErr(''); setPwMsg(''); }}>
-      <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'400px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <KeyRound size={20} style={{color:'#3b82f6'}} />
-          <h6 style={{margin:0,fontWeight:600}}>Change Password</h6>
-          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{border:'none',padding:'0.25rem'}} onClick={() => { setShowPwModal(false); setPwErr(''); setPwMsg(''); }}><X size={18} /></button>
-        </div>
-        {pwErr && <div className="alert alert-danger py-2 small">{pwErr}</div>}
-        {pwMsg && <div className="alert alert-success py-2 small d-flex align-items-center gap-2"><Check size={16} />{pwMsg}</div>}
-        <form onSubmit={handleChangePassword}>
-          <div className="mb-2">
-            <label className="form-label">Current Password</label>
-            <input type="password" className="form-control" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} autoFocus />
-          </div>
-          <div className="mb-3">
-            <label className="form-label">New Password</label>
-            <input type="password" className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-          </div>
-          <button type="submit" className="btn w-100" disabled={pwLoading} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500}}>
-            {pwLoading ? <span className="spinner-border spinner-border-sm" /> : 'Update Password'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+  const closeModal = () => { setShowPwModal(false); setPwErr(''); setPwMsg(''); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); };
 
   return (
     <>
-      <div className={`sidebar-overlay${open ? ' open' : ''}`} onClick={onClose} />
+      <div className={`sidebar-overlay${open ? ' open' : ''}`} onClick={closeModal} />
       <aside className={`sidebar${open ? ' open' : ''}`}>
         <div className="sidebar-header">
           <Building2 />
@@ -127,7 +113,36 @@ export default function Sidebar({ user, onLogout, open, onClose }) {
         </div>
       </aside>
 
-      {showPwModal && <PwModal />}
+      {showPwModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1060}} onClick={closeModal}>
+          <div style={{background:'#fff',borderRadius:'1rem',padding:'1.5rem',width:'100%',maxWidth:'400px',boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <KeyRound size={20} style={{color:'#3b82f6'}} />
+              <h6 style={{margin:0,fontWeight:600}}>Change Password</h6>
+              <button className="btn btn-sm btn-outline-secondary ms-auto" style={{border:'none',padding:'0.25rem'}} onClick={closeModal}><X size={18} /></button>
+            </div>
+            {pwErr && <div className="alert alert-danger py-2 small">{pwErr}</div>}
+            {pwMsg && <div className="alert alert-success py-2 small d-flex align-items-center gap-2"><Check size={16} />{pwMsg}</div>}
+            <form onSubmit={handleChangePassword}>
+              <div className="mb-2">
+                <label className="form-label">Current Password</label>
+                <input type="password" className="form-control" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} autoFocus />
+              </div>
+              <div className="mb-2">
+                <label className="form-label">New Password</label>
+                <input type="password" className="form-control" autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Confirm New Password</label>
+                <input type="password" className="form-control" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+              </div>
+              <button type="submit" className="btn w-100" disabled={pwLoading} style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500}}>
+                {pwLoading ? <span className="spinner-border spinner-border-sm" /> : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import {
@@ -27,30 +27,56 @@ export default function Employees() {
   const [departments, setDepartments] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState('');
   const limit = 10;
+  const searchTimer = useRef(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    api.get('/departments').then(r => setDepartments(r.data)).catch(() => {});
+    mountedRef.current = true;
+    api.get('/departments').then(r => { if (mountedRef.current) setDepartments(r.data); }).catch(() => {});
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (statusFilter) params.set('status', statusFilter);
-    if (deptFilter) params.set('departID', deptFilter);
-    api.get(`/employees?${params}`)
-      .then(r => {
-        const data = Array.isArray(r.data) ? r.data : r.data.employees || [];
-        setEmployees(data);
-        setTotal(data.length);
-      }).catch(() => {});
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+      setDataLoading(true);
+      setError('');
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (statusFilter) params.set('status', statusFilter);
+      if (deptFilter) params.set('departID', deptFilter);
+      params.set('page', page);
+      params.set('limit', limit);
+      api.get(`/employees?${params}`)
+        .then(r => {
+          if (!mountedRef.current) return;
+          const data = r.data;
+          if (data.employees) {
+            setEmployees(data.employees);
+            setTotal(data.total);
+          } else if (Array.isArray(data)) {
+            setEmployees(data);
+            setTotal(data.length);
+          }
+        }).catch(() => {
+          if (mountedRef.current) setError('Failed to load employees.');
+        }).finally(() => {
+          if (mountedRef.current) setDataLoading(false);
+        });
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search, statusFilter, deptFilter, page]);
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this employee?')) return;
+    if (!window.confirm('Delete this employee?')) return;
     try {
       await api.delete(`/employees/${id}`);
       setEmployees(prev => prev.filter(e => e.EmpID !== id));
+      setTotal(prev => prev - 1);
     } catch (err) {
       alert(err.response?.data?.message || 'Delete failed');
     }
@@ -88,53 +114,61 @@ export default function Employees() {
         </Link>
       </div>
 
+      {error && <div className="alert alert-danger py-2 small">{error}</div>}
+
       <div className="card-dash" style={{overflow:'hidden'}}>
         <div style={{overflowX:'auto'}}>
-          <table className="table table-dash">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Gender</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th style={{width:'90px'}}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.length === 0 && (
-                <tr><td colSpan={6} className="text-center text-muted py-4">No employees found.</td></tr>
-              )}
-              {employees.map(emp => {
-                const Icon = statusIcons[emp.EmpStatus] || UserCheck;
-                const sColor = statusColors[emp.EmpStatus] || '#64748b';
-                const sBg = statusBgs[emp.EmpStatus] || '#e2e8f0';
-                return (
-                  <tr key={emp.EmpID}>
-                    <td style={{fontWeight:500}}>{emp.EmpFirstName} {emp.EmpLastName}</td>
-                    <td>{emp.EmpGender}</td>
-                    <td>{emp.EmpEmail}</td>
-                    <td>{emp.EmpTelephone || '-'}</td>
-                    <td>
-                      <span className="badge-status" style={{background:sBg,color:sColor,display:'inline-flex',alignItems:'center',gap:'0.25rem'}}>
-                        <Icon size={11} /> {emp.EmpStatus}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Link to={`/employees/${emp.EmpID}`} className="btn-action edit"><Pencil size={14} /></Link>
-                        <button className="btn-action delete" onClick={() => handleDelete(emp.EmpID)}><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {dataLoading ? (
+            <div className="text-center py-4">
+              <div className="spinner-border spinner-border-sm text-primary" />
+            </div>
+          ) : (
+            <table className="table table-dash">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Gender</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th style={{width:'90px'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.length === 0 && (
+                  <tr><td colSpan={6} className="text-center text-muted py-4">No employees found.</td></tr>
+                )}
+                {employees.map(emp => {
+                  const Icon = statusIcons[emp.EmpStatus] || UserCheck;
+                  const sColor = statusColors[emp.EmpStatus] || '#64748b';
+                  const sBg = statusBgs[emp.EmpStatus] || '#e2e8f0';
+                  return (
+                    <tr key={emp.EmpID}>
+                      <td style={{fontWeight:500}}>{emp.EmpFirstName} {emp.EmpLastName}</td>
+                      <td>{emp.EmpGender}</td>
+                      <td>{emp.EmpEmail}</td>
+                      <td>{emp.EmpTelephone || '-'}</td>
+                      <td>
+                        <span className="badge-status" style={{background:sBg,color:sColor,display:'inline-flex',alignItems:'center',gap:'0.25rem'}}>
+                          <Icon size={11} /> {emp.EmpStatus}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Link to={`/employees/${emp.EmpID}`} className="btn-action edit"><Pencil size={14} /></Link>
+                          <button className="btn-action delete" onClick={() => handleDelete(emp.EmpID)}><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
         {totalPages > 1 && (
           <div className="d-flex justify-content-between align-items-center px-3 py-2" style={{borderTop:'1px solid #e2e8f0'}}>
-            <small className="text-muted">Page {page} of {totalPages}</small>
+            <small className="text-muted">Page {page} of {totalPages} ({total} total)</small>
             <div className="d-flex gap-1">
               <button className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
                 <ChevronLeft size={16} />

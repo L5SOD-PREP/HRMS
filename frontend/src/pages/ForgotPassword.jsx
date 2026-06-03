@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { Building2, ArrowLeft, ShieldCheck, KeyRound, CheckCircle } from 'lucide-react';
@@ -13,6 +13,11 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const navigateTimer = useRef(null);
+
+  useEffect(() => {
+    return () => { if (navigateTimer.current) clearTimeout(navigateTimer.current); };
+  }, []);
 
   const handleGetQuestion = async (e) => {
     e.preventDefault();
@@ -45,20 +50,21 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError(''); setMessage('');
     if (!newPassword.trim()) { setError('Enter a new password'); return; }
+    if (newPassword.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
     try {
       await api.post('/auth/reset-password', { username, answer, newPassword });
       setMessage('Password reset successfully!');
-      setTimeout(() => navigate('/login'), 2000);
+      navigateTimer.current = setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset failed');
     } finally { setLoading(false); }
   };
 
   const stepIndicator = (num) => (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.5rem',marginBottom:'1.5rem'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.5rem',marginBottom:'1.5rem'}} role="navigation" aria-label="Reset password steps">
       {[1,2,3].map(s => (
-        <div key={s} style={{
+        <div key={s} role="step" aria-current={step === s ? 'step' : undefined} style={{
           width:'32px',height:'32px',borderRadius:'50%',
           display:'flex',alignItems:'center',justifyContent:'center',
           fontWeight:600,fontSize:'0.85rem',
@@ -102,7 +108,9 @@ export default function ForgotPassword() {
           <form onSubmit={handleVerifyAnswer}>
             <div className="mb-3">
               <label className="form-label">Security Question</label>
-              <input type="text" className="form-control" value={question} disabled style={{background:'#f1f5f9'}} />
+              <div className="form-control" style={{background:'#f1f5f9',padding:'0.5rem 0.75rem',borderRadius:'0.375rem',fontSize:'0.9rem'}}>
+                {question}
+              </div>
             </div>
             <div className="mb-3">
               <label className="form-label">Your Answer</label>
@@ -119,7 +127,7 @@ export default function ForgotPassword() {
           <form onSubmit={handleResetPassword}>
             <div className="mb-3">
               <label className="form-label">New Password</label>
-              <input type="password" className="form-control" placeholder="Enter new password" value={newPassword} onChange={e => setNewPassword(e.target.value)} autoFocus />
+              <input type="password" className="form-control" placeholder="At least 6 characters" value={newPassword} onChange={e => setNewPassword(e.target.value)} autoFocus />
             </div>
             <button type="submit" className="btn btn-primary w-100" disabled={loading}>
               {loading ? <span className="spinner-border spinner-border-sm" /> : <KeyRound size={16} style={{marginRight:'0.35rem',verticalAlign:'middle'}} />}

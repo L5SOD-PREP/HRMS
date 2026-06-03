@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { FileText, Printer, Users, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
-import { applyPlugin } from 'jspdf-autotable';
-applyPlugin(jsPDF);
+import 'jspdf-autotable';
 
 const allStatuses = ['Active', 'On leave', 'Left', 'Blacklisted', 'Deceased', 'On mission'];
 
@@ -21,25 +20,44 @@ export default function Report() {
   const [total, setTotal] = useState(0);
   const [selectedStatuses, setSelectedStatuses] = useState(['On leave']);
   const [counts, setCounts] = useState({});
+  const [reportLoading, setReportLoading] = useState(false);
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [error, setError] = useState('');
   const contentRef = useRef(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     api.get('/reports/employee-count-by-status').then(r => {
+      if (!mountedRef.current) return;
       const m = {}; for (const row of r.data) m[row.EmpStatus] = row.count;
       setCounts(m);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (mountedRef.current) setCountsLoading(false);
+    });
+    return () => { mountedRef.current = false; };
   }, []);
 
   const fetchReport = () => {
+    if (selectedStatuses.length === 0) { setError('Select at least one status.'); return; }
+    setError('');
+    setReportLoading(true);
     const query = selectedStatuses.join(',');
     api.get(`/reports/employees-on-leave?status=${query}`).then(r => {
+      if (!mountedRef.current) return;
       const data = r.data?.departments || {};
       setReport(Object.keys(data).map(name => ({ DepartName: name, employees: data[name] })));
       setTotal(r.data?.total || 0);
-    }).catch(() => {});
+    }).catch(() => {
+      if (mountedRef.current) setError('Failed to generate report.');
+    }).finally(() => {
+      if (mountedRef.current) setReportLoading(false);
+    });
   };
 
-  useEffect(() => { fetchReport(); }, []);
+  useEffect(() => {
+    if (!countsLoading) fetchReport();
+  }, [countsLoading]);
 
   const toggleStatus = (s) => {
     setSelectedStatuses(prev =>
@@ -50,6 +68,13 @@ export default function Report() {
   const exportPDF = () => {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     const pageW = doc.internal.pageSize.getWidth();
+    let pageNum = 1;
+
+    const addFooter = () => {
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`DAB Enterprise LTD — HRMS Report • Page ${pageNum}`, pageW / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+    };
 
     doc.setFontSize(18);
     doc.setTextColor(59, 130, 246);
@@ -64,7 +89,7 @@ export default function Report() {
 
     let yPos = 52;
     for (const dept of report) {
-      if (yPos > 180) { doc.addPage(); yPos = 20; }
+      if (yPos > 180) { doc.addPage(); pageNum++; yPos = 20; }
 
       doc.setFillColor(59, 130, 246);
       doc.rect(14, yPos - 4, pageW - 28, 8, 'F');
@@ -94,10 +119,7 @@ export default function Report() {
       yPos = doc.lastAutoTable.finalY + 8;
     }
 
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`DAB Enterprise LTD — HRMS Report • Page 1`, pageW / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-
+    addFooter();
     doc.save('Employee_Status_Report.pdf');
   };
 
@@ -110,8 +132,8 @@ export default function Report() {
 
   return (
     <>
-      {/* Controls */}
       <div className="card-dash p-3 mb-3">
+        {error && <div className="alert alert-danger py-1 small mb-2">{error}</div>}
         <div className="d-flex flex-wrap align-items-center gap-2">
           <span style={{fontWeight:600,fontSize:'0.9rem',marginRight:'0.5rem'}}>Filter by Status:</span>
           {allStatuses.map(s => {
@@ -128,14 +150,13 @@ export default function Report() {
               </button>
             );
           })}
-          <button className="btn" onClick={fetchReport}
+          <button className="btn" onClick={fetchReport} disabled={reportLoading}
             style={{background:'#3b82f6',color:'#fff',borderRadius:'0.5rem',fontWeight:500,fontSize:'0.85rem',padding:'0.4rem 1rem',marginLeft:'auto'}}>
-            Generate Report
+            {reportLoading ? <span className="spinner-border spinner-border-sm" /> : 'Generate Report'}
           </button>
         </div>
       </div>
 
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <h5 style={{margin:0,fontWeight:600}}>Employee Status Report</h5>
@@ -156,7 +177,6 @@ export default function Report() {
         </div>
       </div>
 
-      {/* Summary Cards */}
       {selectedStatuses.length > 0 && (
         <div className="row g-2 mb-3">
           {selectedStatuses.map(s => {
@@ -174,7 +194,6 @@ export default function Report() {
         </div>
       )}
 
-      {/* Totals bar */}
       <div className="card-dash p-3 mb-3 d-flex align-items-center gap-2" style={{borderLeft:'4px solid #3b82f6'}}>
         <Users size={18} style={{color:'#3b82f6'}} />
         <span style={{fontWeight:600}}>Total:</span>
@@ -182,9 +201,12 @@ export default function Report() {
         <span className="text-muted small">employee{total !== 1 ? 's' : ''} across {report.length} department{report.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Report Content */}
       <div ref={contentRef}>
-        {report.length === 0 ? (
+        {reportLoading ? (
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" />
+          </div>
+        ) : report.length === 0 ? (
           <div className="card-dash p-4 text-center text-muted">
             <FileText size={32} style={{marginBottom:'0.5rem',opacity:0.3}} />
             <p className="mb-0">No employees match the selected statuses.</p>

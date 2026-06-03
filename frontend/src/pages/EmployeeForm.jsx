@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { Save, ArrowLeft } from 'lucide-react';
@@ -15,14 +15,25 @@ export default function EmployeeForm() {
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState('');
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/departments').then(r => setDepartments(r.data)),
-      api.get('/positions').then(r => setPositions(r.data)),
-      isEdit ? api.get(`/employees/${id}`).then(r => {
-        const e = r.data.employee || r.data;
+    mountedRef.current = true;
+    const promises = [
+      api.get('/departments'),
+      api.get('/positions'),
+    ];
+    if (isEdit) {
+      promises.push(api.get(`/employees/${id}`));
+    }
+    Promise.all(promises).then(([deptRes, posRes, empRes]) => {
+      if (!mountedRef.current) return;
+      setDepartments(deptRes.data);
+      setPositions(posRes.data);
+      if (empRes) {
+        const e = empRes.data.employee || empRes.data;
         setForm({
           EmpFirstName:e.EmpFirstName||'', EmpLastName:e.EmpLastName||'',
           EmpGender:e.EmpGender||'Male', EmpDateOfBirth:e.EmpDateOfBirth?.split('T')[0]||'',
@@ -30,8 +41,13 @@ export default function EmployeeForm() {
           EmpAddress:e.EmpAddress||'', EmpHireDate:e.EmpHireDate?.split('T')[0]||'',
           EmpStatus:e.EmpStatus||'Active', DeptID:e.DeptID||'', PosID:e.PosID||'',
         });
-      }) : Promise.resolve(),
-    ]).catch(() => {});
+      }
+    }).catch(() => {
+      if (mountedRef.current) setError('Failed to load data.');
+    }).finally(() => {
+      if (mountedRef.current) setInitialLoading(false);
+    });
+    return () => { mountedRef.current = false; };
   }, [id]);
 
   const handleChange = (e) => setForm({...form,[e.target.name]:e.target.value});
@@ -41,6 +57,23 @@ export default function EmployeeForm() {
     setError('');
     if (!form.EmpFirstName || !form.EmpLastName || !form.EmpEmail) {
       setError('First name, last name, and email are required'); return;
+    }
+    if (/\d/.test(form.EmpFirstName) || /\d/.test(form.EmpLastName)) {
+      setError('Name cannot contain numbers.'); return;
+    }
+    if (form.EmpEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.EmpEmail)) {
+      setError('Invalid email format.'); return;
+    }
+    if (form.EmpDateOfBirth) {
+      const dob = new Date(form.EmpDateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
+      if (age < 18) { setError('Employee must be at least 18 years old.'); return; }
+    }
+    if (form.EmpHireDate && new Date(form.EmpHireDate) > new Date()) {
+      setError('Hire date cannot be in the future.'); return;
     }
     setLoading(true);
     try {
@@ -56,6 +89,14 @@ export default function EmployeeForm() {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>

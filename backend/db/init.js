@@ -8,11 +8,15 @@ const config = {
   password: process.env.DB_PASSWORD || ''
 };
 
+const dbName = process.env.DB_NAME || 'HRMS';
+const adminPw = process.env.ADMIN_PASSWORD || 'Admin@123';
+const adminSecAnswer = process.env.ADMIN_SECURITY_ANSWER || 'blue';
+
 async function initDb() {
   const conn = await mysql.createConnection(config);
 
-  await conn.query('CREATE DATABASE IF NOT EXISTS HRMS CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-  await conn.query('USE HRMS');
+  await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await conn.query(`USE \`${dbName}\``);
 
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS Department (
@@ -86,16 +90,18 @@ async function initDb() {
       ['Alice', 'Mutoni', 'Female', '1995-12-10', 'alice@hrms.com', '0788333333', 'Kigali', '2024-04-01', 'On mission', 3, 5]
     ];
     for (const e of employees) {
-      await conn.execute(`INSERT INTO Employee 
-        (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID) 
+      await conn.execute(`INSERT INTO Employee
+        (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, e);
     }
 
-    const hash = bcrypt.hashSync('Admin@123', 10);
+    const hash = await bcrypt.hash(adminPw, 10);
     await conn.execute('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)', [1, 'admin', hash]);
 
-    const secHash = bcrypt.hashSync('blue', 10);
+    const secHash = await bcrypt.hash(adminSecAnswer, 10);
     await conn.execute('INSERT INTO Security (UserID, UserName, question, answer) VALUES (?, ?, ?, ?)', [1, 'admin', 'What is your favorite color?', secHash]);
+
+    console.log('Base data seeded.');
   }
 
   await conn.end();

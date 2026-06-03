@@ -51,8 +51,8 @@ export default function Landing() {
       </div>
 
       <div className="landing-features">
-        {features.map((f, i) => (
-          <div className="landing-feat-card" key={i}>
+        {features.map((f) => (
+          <div className="landing-feat-card" key={f.title}>
             <f.icon />
             <h5>{f.title}</h5>
             <p>{f.desc}</p>

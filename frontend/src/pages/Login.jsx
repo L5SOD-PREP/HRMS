@@ -47,7 +47,7 @@ export default function Login() {
             <input
               type="text" className="form-control" placeholder="Enter your username"
               value={username} onChange={(e) => setUsername(e.target.value)}
-              autoFocus
+              autoComplete="username" autoFocus
             />
           </div>
           <div className="mb-3">
@@ -56,8 +56,9 @@ export default function Login() {
               <input
                 type={showPw ? 'text' : 'password'} className="form-control" placeholder="Enter your password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
-              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPw(!showPw)} style={{borderColor:'#e2e8f0'}}>
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Hide password' : 'Show password'} style={{borderColor:'#e2e8f0'}}>
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
