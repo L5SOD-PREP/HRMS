@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
-import { init } from './config/database.js';
+import pool from './config/database.js';
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
 import departmentRoutes from './routes/departments.js';
@@ -34,11 +34,14 @@ app.use('/api/reports', reportRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-init().then(() => {
+// Verify DB connection on startup
+pool.getConnection().then(conn => {
+  console.log('Connected to MySQL database');
+  conn.release();
   app.listen(PORT, () => {
     console.log(`HRMS Backend running on http://localhost:${PORT}`);
   });
 }).catch(err => {
-  console.error('Failed to initialize database:', err);
+  console.error('Database connection failed:', err.message);
   process.exit(1);
 });

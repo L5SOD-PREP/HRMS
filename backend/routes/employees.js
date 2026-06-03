@@ -1,75 +1,77 @@
 import { Router } from 'express';
-import { all, get, run, save } from '../config/database.js';
+import pool from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const { search } = req.query;
-  let sql = `SELECT e.*, d.DepartName, p.PosName 
-    FROM Employee e 
-    LEFT JOIN Department d ON e.DepartID = d.DepartID 
-    LEFT JOIN Position p ON e.PosID = p.PosID`;
-  const params = [];
-  if (search) {
-    sql += ` WHERE e.EmpFirstName LIKE ? OR e.EmpLastName LIKE ? OR e.EmpEmail LIKE ? OR e.EmpTelephone LIKE ?`;
-    const s = `%${search}%`;
-    params.push(s, s, s, s);
-  }
-  sql += ' ORDER BY e.EmpID DESC';
-  return res.json(all(sql, params));
+router.get('/', async (req, res) => {
+  try {
+    const { search } = req.query;
+    let sql = `SELECT e.*, d.DepartName, p.PosName 
+      FROM Employee e 
+      LEFT JOIN Department d ON e.DepartID = d.DepartID 
+      LEFT JOIN \`Position\` p ON e.PosID = p.PosID`;
+    const params = [];
+    if (search) {
+      sql += ` WHERE e.EmpFirstName LIKE ? OR e.EmpLastName LIKE ? OR e.EmpEmail LIKE ? OR e.EmpTelephone LIKE ?`;
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
+    }
+    sql += ' ORDER BY e.EmpID DESC';
+    const [rows] = await pool.execute(sql, params);
+    return res.json(rows);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.get('/:id', (req, res) => {
-  const emp = get(
-    `SELECT e.*, d.DepartName, p.PosName 
-     FROM Employee e LEFT JOIN Department d ON e.DepartID = d.DepartID 
-     LEFT JOIN Position p ON e.PosID = p.PosID WHERE e.EmpID = ?`,
-    [req.params.id]
-  );
-  if (!emp) return res.status(404).json({ error: 'Employee not found.' });
-  return res.json(emp);
+router.get('/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT e.*, d.DepartName, p.PosName 
+       FROM Employee e LEFT JOIN Department d ON e.DepartID = d.DepartID 
+       LEFT JOIN \`Position\` p ON e.PosID = p.PosID WHERE e.EmpID = ?`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Employee not found.' });
+    return res.json(rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', (req, res) => {
-  const { EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID } = req.body;
-  if (!EmpFirstName || !EmpLastName) {
-    return res.status(400).json({ error: 'First and last name are required.' });
-  }
-  const validStatuses = ['On leave', 'Left', 'Blacklisted', 'Deceased', 'On mission'];
-  const status = validStatuses.includes(EmpStatus) ? EmpStatus : 'On mission';
-  run(
-    `INSERT INTO Employee 
-     (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [EmpFirstName, EmpLastName, EmpGender || null, EmpDateOfBirth || null,
-     EmpEmail || null, EmpTelephone || null, EmpAddress || null,
-     EmpHireDate || null, status, DepartID || null, PosID || null]
-  );
-  save();
-  const inserted = get('SELECT MAX(EmpID) as EmpID FROM Employee');
-  return res.status(201).json({ EmpID: inserted.EmpID, message: 'Employee created.' });
+router.post('/', async (req, res) => {
+  try {
+    const { EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID } = req.body;
+    if (!EmpFirstName || !EmpLastName) return res.status(400).json({ error: 'First and last name are required.' });
+
+    const validStatuses = ['On leave', 'Left', 'Blacklisted', 'Deceased', 'On mission'];
+    const status = validStatuses.includes(EmpStatus) ? EmpStatus : 'On mission';
+
+    const [result] = await pool.execute(
+      `INSERT INTO Employee (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [EmpFirstName, EmpLastName, EmpGender || null, EmpDateOfBirth || null, EmpEmail || null, EmpTelephone || null, EmpAddress || null, EmpHireDate || null, status, DepartID || null, PosID || null]
+    );
+    return res.status(201).json({ EmpID: result.insertId, message: 'Employee created.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id', (req, res) => {
-  const { EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID } = req.body;
-  const validStatuses = ['On leave', 'Left', 'Blacklisted', 'Deceased', 'On mission'];
-  const status = validStatuses.includes(EmpStatus) ? EmpStatus : 'On mission';
-  run(
-    `UPDATE Employee SET EmpFirstName=?, EmpLastName=?, EmpGender=?, EmpDateOfBirth=?, EmpEmail=?, 
-     EmpTelephone=?, EmpAddress=?, EmpHireDate=?, EmpStatus=?, DepartID=?, PosID=? WHERE EmpID=?`,
-    [EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail,
-     EmpTelephone, EmpAddress, EmpHireDate, status, DepartID, PosID, req.params.id]
-  );
-  save();
-  return res.json({ message: 'Employee updated.' });
+router.put('/:id', async (req, res) => {
+  try {
+    const { EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID } = req.body;
+    const validStatuses = ['On leave', 'Left', 'Blacklisted', 'Deceased', 'On mission'];
+    const status = validStatuses.includes(EmpStatus) ? EmpStatus : 'On mission';
+
+    await pool.execute(
+      `UPDATE Employee SET EmpFirstName=?, EmpLastName=?, EmpGender=?, EmpDateOfBirth=?, EmpEmail=?, EmpTelephone=?, EmpAddress=?, EmpHireDate=?, EmpStatus=?, DepartID=?, PosID=? WHERE EmpID=?`,
+      [EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, status, DepartID, PosID, req.params.id]
+    );
+    return res.json({ message: 'Employee updated.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id', (req, res) => {
-  run('DELETE FROM Employee WHERE EmpID = ?', [req.params.id]);
-  save();
-  return res.json({ message: 'Employee deleted.' });
+router.delete('/:id', async (req, res) => {
+  try {
+    await pool.execute('DELETE FROM Employee WHERE EmpID = ?', [req.params.id]);
+    return res.json({ message: 'Employee deleted.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 export default router;

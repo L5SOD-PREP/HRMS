@@ -1,47 +1,49 @@
 import { Router } from 'express';
-import { all, get, run, save } from '../config/database.js';
+import pool from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const depts = all(
-    `SELECT d.*, (SELECT COUNT(*) FROM Employee e WHERE e.DepartID = d.DepartID) as EmpCount 
-     FROM Department d ORDER BY d.DepartName`
-  );
-  return res.json(depts);
+router.get('/', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT d.*, (SELECT COUNT(*) FROM Employee e WHERE e.DepartID = d.DepartID) as EmpCount 
+       FROM Department d ORDER BY d.DepartName`
+    );
+    return res.json(rows);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', (req, res) => {
-  const { DepartName } = req.body;
-  if (!DepartName) return res.status(400).json({ error: 'Department name is required.' });
+router.post('/', async (req, res) => {
   try {
-    run('INSERT INTO Department (DepartName) VALUES (?)', [DepartName]);
-    save();
-    const inserted = get('SELECT MAX(DepartID) as DepartID FROM Department');
-    return res.status(201).json({ DepartID: inserted.DepartID, message: 'Department created.' });
-  } catch {
-    return res.status(400).json({ error: 'Department name already exists.' });
+    const { DepartName } = req.body;
+    if (!DepartName) return res.status(400).json({ error: 'Department name is required.' });
+    const [result] = await pool.execute('INSERT INTO Department (DepartName) VALUES (?)', [DepartName]);
+    return res.status(201).json({ DepartID: result.insertId, message: 'Department created.' });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Department name already exists.' });
+    return res.status(500).json({ error: err.message });
   }
 });
 
-router.put('/:id', (req, res) => {
-  const { DepartName } = req.body;
-  if (!DepartName) return res.status(400).json({ error: 'Department name is required.' });
+router.put('/:id', async (req, res) => {
   try {
-    run('UPDATE Department SET DepartName = ? WHERE DepartID = ?', [DepartName, req.params.id]);
-    save();
+    const { DepartName } = req.body;
+    if (!DepartName) return res.status(400).json({ error: 'Department name is required.' });
+    await pool.execute('UPDATE Department SET DepartName = ? WHERE DepartID = ?', [DepartName, req.params.id]);
     return res.json({ message: 'Department updated.' });
-  } catch {
-    return res.status(400).json({ error: 'Department name already exists.' });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Department name already exists.' });
+    return res.status(500).json({ error: err.message });
   }
 });
 
-router.delete('/:id', (req, res) => {
-  run('DELETE FROM Department WHERE DepartID = ?', [req.params.id]);
-  save();
-  return res.json({ message: 'Department deleted.' });
+router.delete('/:id', async (req, res) => {
+  try {
+    await pool.execute('DELETE FROM Department WHERE DepartID = ?', [req.params.id]);
+    return res.json({ message: 'Department deleted.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 export default router;

@@ -11,28 +11,34 @@ export default function Report() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-center mt-5"><div className="spinner-border"></div></div>;
+  if (loading) return <div className="text-center mt-5"><div className="spinner-border text-primary"></div><p className="mt-2 text-muted">Loading report...</p></div>;
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h4 className="mb-0">Employee Status Report - On Leave</h4>
-        <button className="btn btn-secondary" onClick={() => window.print()}>Print Report</button>
+      <div className="action-bar">
+        <h4 className="page-title" style={{ border: 'none', padding: 0, margin: 0 }}><i className="bi bi-file-earmark-text me-2"></i>Employee Status Report — On Leave</h4>
+        <button className="btn btn-outline-secondary" onClick={() => window.print()}>
+          <i className="bi bi-printer me-1"></i>Print
+        </button>
       </div>
 
-      <div className="alert alert-info">
+      <div className="alert alert-info d-flex align-items-center gap-2 py-2">
+        <i className="bi bi-info-circle"></i>
         <strong>Total employees on leave: {report?.total || 0}</strong>
       </div>
 
       {report && Object.keys(report.departments).length === 0 && (
-        <div className="alert alert-warning">No employees are currently on leave.</div>
+        <div className="alert alert-warning"><i className="bi bi-exclamation-triangle me-2"></i>No employees are currently on leave.</div>
       )}
 
       {report && Object.entries(report.departments).map(([dept, employees]) => (
         <div className="card mb-3" key={dept}>
-          <div className="card-header fw-bold">{dept} ({employees.length})</div>
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <span><i className="bi bi-diagram-3 me-2"></i>{dept}</span>
+            <span className="badge bg-primary rounded-pill">{employees.length}</span>
+          </div>
           <div className="card-body p-0">
-            <table className="table table-striped mb-0">
+            <table className="table table-custom mb-0">
               <thead>
                 <tr>
                   <th>#</th><th>First Name</th><th>Last Name</th><th>Gender</th><th>Email</th><th>Phone</th><th>Position</th>

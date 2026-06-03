@@ -1,39 +1,43 @@
 import { Router } from 'express';
-import { all, get, run, save } from '../config/database.js';
+import pool from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const positions = all(
-    `SELECT p.*, (SELECT COUNT(*) FROM Employee e WHERE e.PosID = p.PosID) as EmpCount 
-     FROM Position p ORDER BY p.PosName`
-  );
-  return res.json(positions);
+router.get('/', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT p.*, (SELECT COUNT(*) FROM Employee e WHERE e.PosID = p.PosID) as EmpCount 
+       FROM \`Position\` p ORDER BY p.PosName`
+    );
+    return res.json(rows);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', (req, res) => {
-  const { PosName, RequiredQualification } = req.body;
-  if (!PosName) return res.status(400).json({ error: 'Position name is required.' });
-  run('INSERT INTO Position (PosName, RequiredQualification) VALUES (?, ?)', [PosName, RequiredQualification || null]);
-  save();
-  const inserted = get('SELECT MAX(PosID) as PosID FROM Position');
-  return res.status(201).json({ PosID: inserted.PosID, message: 'Position created.' });
+router.post('/', async (req, res) => {
+  try {
+    const { PosName, RequiredQualification } = req.body;
+    if (!PosName) return res.status(400).json({ error: 'Position name is required.' });
+    const [result] = await pool.execute('INSERT INTO \`Position\` (PosName, RequiredQualification) VALUES (?, ?)', [PosName, RequiredQualification || null]);
+    return res.status(201).json({ PosID: result.insertId, message: 'Position created.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id', (req, res) => {
-  const { PosName, RequiredQualification } = req.body;
-  if (!PosName) return res.status(400).json({ error: 'Position name is required.' });
-  run('UPDATE Position SET PosName = ?, RequiredQualification = ? WHERE PosID = ?', [PosName, RequiredQualification || null, req.params.id]);
-  save();
-  return res.json({ message: 'Position updated.' });
+router.put('/:id', async (req, res) => {
+  try {
+    const { PosName, RequiredQualification } = req.body;
+    if (!PosName) return res.status(400).json({ error: 'Position name is required.' });
+    await pool.execute('UPDATE \`Position\` SET PosName = ?, RequiredQualification = ? WHERE PosID = ?', [PosName, RequiredQualification || null, req.params.id]);
+    return res.json({ message: 'Position updated.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id', (req, res) => {
-  run('DELETE FROM Position WHERE PosID = ?', [req.params.id]);
-  save();
-  return res.json({ message: 'Position deleted.' });
+router.delete('/:id', async (req, res) => {
+  try {
+    await pool.execute('DELETE FROM \`Position\` WHERE PosID = ?', [req.params.id]);
+    return res.json({ message: 'Position deleted.' });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 export default router;

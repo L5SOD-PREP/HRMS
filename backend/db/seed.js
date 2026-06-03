@@ -1,29 +1,25 @@
 import 'dotenv/config';
-import initSqlJs from 'sql.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, 'hrms.db');
-
 async function seed() {
-  const SQL = await initSqlJs();
-  const buffer = fs.readFileSync(dbPath);
-  const db = new SQL.Database(buffer);
-  db.run('PRAGMA foreign_keys = ON');
+  const conn = await mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'HRMS'
+  });
 
   const hash = bcrypt.hashSync('Admin@123', 10);
 
-  db.run('UPDATE Users SET Password = ?', [hash]);
+  await conn.execute('UPDATE Users SET Password = ?', [hash]);
   console.log('All user passwords updated to Admin@123');
 
   const extraDepts = ['IT Support', 'Marketing', 'Procurement', 'Research & Development', 'Quality Assurance'];
   for (const name of extraDepts) {
-    const exists = db.exec(`SELECT DepartID FROM Department WHERE DepartName = '${name}'`);
-    if (!exists[0]?.values?.length) {
-      db.run('INSERT INTO Department (DepartName) VALUES (?)', [name]);
+    const [rows] = await conn.execute('SELECT DepartID FROM Department WHERE DepartName = ?', [name]);
+    if (rows.length === 0) {
+      await conn.execute('INSERT INTO Department (DepartName) VALUES (?)', [name]);
       console.log(`  Department added: ${name}`);
     }
   }
@@ -39,9 +35,9 @@ async function seed() {
     ['Cleaner', 'Primary Certificate']
   ];
   for (const [name, qual] of extraPositions) {
-    const exists = db.exec(`SELECT PosID FROM Position WHERE PosName = '${name}'`);
-    if (!exists[0]?.values?.length) {
-      db.run('INSERT INTO Position (PosName, RequiredQualification) VALUES (?, ?)', [name, qual]);
+    const [rows] = await conn.execute('SELECT PosID FROM \`Position\` WHERE PosName = ?', [name]);
+    if (rows.length === 0) {
+      await conn.execute('INSERT INTO \`Position\` (PosName, RequiredQualification) VALUES (?, ?)', [name, qual]);
       console.log(`  Position added: ${name}`);
     }
   }
@@ -60,24 +56,21 @@ async function seed() {
   ];
 
   for (const e of extraEmployees) {
-    const exists = db.exec(`SELECT EmpID FROM Employee WHERE EmpEmail = '${e[4]}'`);
-    if (!exists[0]?.values?.length) {
-      const empStmt = db.prepare(`INSERT INTO Employee 
+    const [rows] = await conn.execute('SELECT EmpID FROM Employee WHERE EmpEmail = ?', [e[4]]);
+    if (rows.length === 0) {
+      await conn.execute(`INSERT INTO Employee 
         (EmpFirstName, EmpLastName, EmpGender, EmpDateOfBirth, EmpEmail, EmpTelephone, EmpAddress, EmpHireDate, EmpStatus, DepartID, PosID) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      empStmt.bind(e);
-      empStmt.step();
-      empStmt.free();
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, e);
       console.log(`  Employee added: ${e[0]} ${e[1]}`);
     }
   }
 
-  const newEmps = db.exec(`
+  const [newEmps] = await conn.execute(`
     SELECT e.EmpID, e.EmpFirstName, e.EmpEmail FROM Employee e 
     WHERE e.EmpID NOT IN (SELECT EmpID FROM Users)
   `);
 
-  if (newEmps[0]?.values) {
+  if (newEmps.length > 0) {
     const questions = [
       'What is your favorite color?',
       'What city were you born in?',
@@ -87,27 +80,19 @@ async function seed() {
     ];
     const ansHash = bcrypt.hashSync('answer123', 10);
 
-    for (const row of newEmps[0].values) {
-      const [empId, firstName, email] = row;
-      const username = email.split('@')[0];
-      const userStmt = db.prepare('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)');
-      userStmt.bind([empId, username, hash]);
-      userStmt.step();
-      userStmt.free();
+    for (const row of newEmps) {
+      const username = row.EmpEmail.split('@')[0];
+      const [userResult] = await conn.execute('INSERT INTO Users (EmpID, UserName, Password) VALUES (?, ?, ?)', [row.EmpID, username, hash]);
+      const userId = userResult.insertId;
       console.log(`  User created: ${username} / Admin@123`);
 
       const q = questions[Math.floor(Math.random() * questions.length)];
-      const secStmt = db.prepare('INSERT INTO Security (UserName, question, answer) VALUES (?, ?, ?)');
-      secStmt.bind([username, q, ansHash]);
-      secStmt.step();
-      secStmt.free();
+      await conn.execute('INSERT INTO Security (UserID, UserName, question, answer) VALUES (?, ?, ?, ?)', [userId, username, q, ansHash]);
       console.log(`  Security Q added for ${username}: ${q}`);
     }
   }
 
-  const data = db.export();
-  fs.writeFileSync(dbPath, Buffer.from(data));
-  db.close();
+  await conn.end();
   console.log('\nSeed completed successfully!');
   console.log('All user passwords: Admin@123');
 }

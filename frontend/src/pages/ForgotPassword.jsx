@@ -48,7 +48,7 @@ export default function ForgotPassword() {
     setMessage('');
     try {
       await api.post('/auth/reset-password', { userId, newPassword });
-      setMessage('Password reset successful! Redirecting to login...');
+      setMessage('Password reset successful! Redirecting...');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       setError(err.response?.data?.error || 'Reset failed');
@@ -60,47 +60,47 @@ export default function ForgotPassword() {
       <div className="row justify-content-center mt-5">
         <div className="col-md-5">
           <div className="card shadow">
+            <div className="card-header"><i className="bi bi-key me-2"></i>Password Recovery</div>
             <div className="card-body p-4">
-              <h3 className="text-center mb-4">Forgot Password</h3>
-              {error && <div className="alert alert-danger">{error}</div>}
-              {message && <div className="alert alert-success">{message}</div>}
+              {error && <div className="alert alert-danger py-2"><i className="bi bi-exclamation-triangle me-2"></i>{error}</div>}
+              {message && <div className="alert alert-success py-2"><i className="bi bi-check-circle me-2"></i>{message}</div>}
 
               {step === 1 && (
                 <form onSubmit={handleGetQuestion}>
                   <div className="mb-3">
-                    <label className="form-label">Username</label>
-                    <input className="form-control" value={username} onChange={e => setUsername(e.target.value)} required />
+                    <label className="form-label"><i className="bi bi-person me-1"></i>Username</label>
+                    <input className="form-control" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} required />
                   </div>
-                  <button type="submit" className="btn btn-primary w-100">Get Security Question</button>
+                  <button type="submit" className="btn btn-primary w-100"><i className="bi bi-question-lg me-1"></i>Get Security Question</button>
                 </form>
               )}
 
               {step === 2 && (
                 <form onSubmit={handleVerifyAnswer}>
                   <div className="mb-3">
-                    <label className="form-label fw-bold">Security Question</label>
-                    <p className="text-muted">{question}</p>
+                    <label className="form-label fw-bold"><i className="bi bi-shield-question me-1"></i>Security Question</label>
+                    <div className="alert alert-info">{question}</div>
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Your Answer</label>
-                    <input className="form-control" value={answer} onChange={e => setAnswer(e.target.value)} required />
+                    <input className="form-control" placeholder="Type your answer" value={answer} onChange={e => setAnswer(e.target.value)} required />
                   </div>
-                  <button type="submit" className="btn btn-primary w-100">Verify Answer</button>
+                  <button type="submit" className="btn btn-primary w-100"><i className="bi bi-check2 me-1"></i>Verify Answer</button>
                 </form>
               )}
 
               {step === 3 && (
                 <form onSubmit={handleResetPassword}>
                   <div className="mb-3">
-                    <label className="form-label">New Password (min 4 chars)</label>
-                    <input type="password" className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={4} />
+                    <label className="form-label"><i className="bi bi-lock me-1"></i>New Password</label>
+                    <input type="password" className="form-control" placeholder="Min 4 characters" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={4} />
                   </div>
-                  <button type="submit" className="btn btn-success w-100">Reset Password</button>
+                  <button type="submit" className="btn btn-success w-100"><i className="bi bi-arrow-clockwise me-1"></i>Reset Password</button>
                 </form>
               )}
 
               <div className="text-center mt-3">
-                <Link to="/login">Back to Login</Link>
+                <Link to="/login" className="text-decoration-none"><i className="bi bi-arrow-left me-1"></i>Back to Login</Link>
               </div>
             </div>
           </div>
